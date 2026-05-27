@@ -1,0 +1,19 @@
+# Julia artifacts
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+Manifest.toml
+
+# Dependency build artifacts
+deps/deps.jl
+deps/build.log
+deps/downloads/
+deps/usr/
+deps/src/
+
+# Documentation build output
+docs/build/
+docs/site/
+
+# macOS
+.DS_Store
