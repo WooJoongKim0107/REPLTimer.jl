@@ -1,0 +1,10 @@
+name = "TimedREPL"
+uuid = "e852b013-b657-42c2-a8cb-f05a2fcbb7ee"
+authors = ["WooJoongKim0107 <henrikwjkim@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+
+[compat]
+julia = "1.6"
