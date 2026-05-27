@@ -1,18 +1,26 @@
 # REPLTimer.jl
 
-Prints elapsed time in the Julia REPL after any evaluation that takes longer than a threshold.
+Prints elapsed time in the Julia REPL after any evaluation that exceeds a configurable threshold (default: 10 seconds).
 
 ```
 julia> sleep(11)
-
 [11.001 sec]
 ```
 
-The timer line overwrites the trailing newline so output stays compact.
+The timing line replaces the trailing blank line, so the output stays compact.
+
+## Installation
+
+Not yet registered in the Julia General Registry. Install directly from GitHub:
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/WooJoongKim0107/REPLTimer.jl")
+```
 
 ## Usage
 
-Call `enable_timed_repl` inside `atreplinit` in your `startup.jl`:
+Add the following to `~/.julia/config/startup.jl`:
 
 ```julia
 using REPLTimer
@@ -21,14 +29,7 @@ atreplinit() do repl
     if !isdefined(repl, :interface)
         repl.interface = REPL.setup_interface(repl)
     end
-    enable_timed_repl(repl)          # default threshold: 10 seconds
-    # enable_timed_repl(repl, 0.5)   # show timing for anything over 0.5 s
+    enable_timed_repl(repl)        # default threshold: 10 seconds
+    # enable_timed_repl(repl, 0.5) # custom threshold in seconds
 end
-```
-
-## Installation
-
-```julia
-using Pkg
-Pkg.add("REPLTimer")
 ```
