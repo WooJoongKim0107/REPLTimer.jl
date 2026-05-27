@@ -1,4 +1,4 @@
-module TimedREPL
+module REPLTimer
 
 export enable_timed_repl
 
@@ -23,4 +23,4 @@ function enable_timed_repl(repl, thr_sec=10)
     end
 end
 
-end # module TimedREPL
+end # module REPLTimer

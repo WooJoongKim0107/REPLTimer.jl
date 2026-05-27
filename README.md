@@ -1,4 +1,4 @@
-# TimedREPL.jl
+# REPLTimer.jl
 
 Prints elapsed time in the Julia REPL after any evaluation that takes longer than a threshold.
 
@@ -15,7 +15,7 @@ The timer line overwrites the trailing newline so output stays compact.
 Call `enable_timed_repl` inside `atreplinit` in your `startup.jl`:
 
 ```julia
-using TimedREPL
+using REPLTimer
 
 atreplinit() do repl
     if !isdefined(repl, :interface)
@@ -30,5 +30,5 @@ end
 
 ```julia
 using Pkg
-Pkg.add("TimedREPL")
+Pkg.add("REPLTimer")
 ```

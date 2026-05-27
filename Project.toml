@@ -1,4 +1,4 @@
-name = "TimedREPL"
+name = "REPLTimer"
 uuid = "e852b013-b657-42c2-a8cb-f05a2fcbb7ee"
 authors = ["WooJoongKim0107 <henrikwjkim@gmail.com>"]
 version = "0.1.0"
