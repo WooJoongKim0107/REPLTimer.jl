@@ -2,7 +2,14 @@ module REPLTimer
 
 export enable_timed_repl
 
-# Wraps julia_mode.on_done to print elapsed time after each evaluation exceeding thr_sec.
+"""
+    enable_timed_repl(repl, thr_sec=10)
+
+Wrap the Julia REPL evaluation callback so that evaluations taking longer than
+`thr_sec` seconds print their elapsed time after completion.
+
+Intended for use from `atreplinit` in `startup.jl`.
+"""
 function enable_timed_repl(repl, thr_sec=10)
     julia_mode = repl.interface.modes[1]
 
