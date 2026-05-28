@@ -1,96 +1,118 @@
-using Test
 using REPLTimer
+using Test
 
-# Minimal mock of the REPL interface that enable_timed_repl accesses:
-#   repl.interface.modes[1].on_done
+# What it tests:
+#
+# The package feature is a small REPL hook: enable_timed_repl replaces
+# repl.interface.modes[1].on_done with a wrapper that times each evaluation.
+# These tests use a minimal mock REPL with that same field path instead of
+# launching an interactive Julia REPL.
+#
+# The suite verifies that the wrapper is installed, delegates the original
+# arguments, preserves the original return value, prints timing output only
+# when the threshold is exceeded, and still propagates exceptions. It does not
+# test the visual terminal behavior of cursor-control escape sequences in a
+# real interactive REPL.
 mutable struct MockMode
     on_done::Function
 end
 
-mutable struct MockInterface
-    modes::Vector{Any}
+struct MockInterface
+    modes::Vector{MockMode}
 end
 
-mutable struct MockREPL
+struct MockREPL
     interface::MockInterface
 end
 
-function mock_repl(f=(s, buf, ok) -> nothing)
-    mode = MockMode(f)
-    MockREPL(MockInterface(Any[mode])), mode
+mock_repl(on_done=(s, buf, ok) -> nothing) = begin
+    mode = MockMode(on_done)
+    MockREPL(MockInterface([mode])), mode
 end
 
-function capture_stdout(f)
-    path = tempname()
-    open(path, "w") do io
-        redirect_stdout(f, io)
+call_on_done(mode; s=nothing, buf=nothing, ok=true) = mode.on_done(s, buf, ok)
+
+function captured_stdout(f)
+    path, io = mktemp()
+    try
+        redirect_stdout(io) do
+            f()
+        end
+        close(io)
+        return read(path, String)
+    finally
+        isopen(io) && close(io)
+        isfile(path) && rm(path)
     end
-    s = read(path, String)
-    rm(path)
-    s
 end
 
-@testset "REPLTimer" begin
-
-    @testset "enable_timed_repl replaces on_done" begin
+@testset "REPLTimer.jl" begin
+    @testset "enable_timed_repl installs a wrapper" begin
         repl, mode = mock_repl()
-        original = mode.on_done
+        original_on_done = mode.on_done
+
         enable_timed_repl(repl)
-        @test mode.on_done !== original
+
+        @test mode.on_done isa Function
+        @test mode.on_done !== original_on_done
     end
 
-    @testset "original on_done is still called" begin
-        called = Ref(false)
-        repl, mode = mock_repl((s, buf, ok) -> (called[] = true))
+    @testset "wrapped on_done delegates arguments and return value" begin
+        seen = Ref{Tuple{Any,Any,Bool}}()
+        repl, mode = mock_repl() do s, buf, ok
+            seen[] = (s, buf, ok)
+            :result
+        end
+
         enable_timed_repl(repl)
-        mode.on_done(nothing, nothing, true)
-        @test called[]
+
+        state = (prompt=:julia,)
+        buffer = IOBuffer("1 + 1")
+        @test call_on_done(mode; s=state, buf=buffer, ok=false) === :result
+        @test seen[] === (state, buffer, false)
     end
 
-    @testset "original return value is preserved" begin
-        repl, mode = mock_repl((s, buf, ok) -> 42)
-        enable_timed_repl(repl)
-        @test mode.on_done(nothing, nothing, true) == 42
-    end
-
-    @testset "prints timing when threshold exceeded" begin
+    @testset "output respects threshold" begin
         repl, mode = mock_repl()
-        enable_timed_repl(repl, -1.0)  # negative threshold always triggers
-        out = capture_stdout(() -> mode.on_done(nothing, nothing, true))
-        @test occursin(r"\[\d+\.\d+ sec\]", out)
-    end
+        enable_timed_repl(repl, Inf)
 
-    @testset "no output when below threshold" begin
+        @test captured_stdout(() -> call_on_done(mode)) == ""
+
         repl, mode = mock_repl()
-        enable_timed_repl(repl, 9999.0)  # threshold far above any real elapsed time
-        out = capture_stdout(() -> mode.on_done(nothing, nothing, true))
-        @test isempty(out)
+        enable_timed_repl(repl, -Inf)
+
+        output = captured_stdout(() -> call_on_done(mode))
+        @test occursin(r"\e\[1A\r\e\[2K\e\[90m\[\d+\.\d+ sec\]\e\[0m\n", output)
     end
 
-    @testset "default threshold is 10 seconds" begin
-        # Verify the default: a fast call produces no output
+    @testset "default threshold suppresses fast evaluations" begin
         repl, mode = mock_repl()
-        enable_timed_repl(repl)  # default thr_sec = 10
-        out = capture_stdout(() -> mode.on_done(nothing, nothing, true))
-        @test isempty(out)
-    end
-
-    @testset "exception from evaluation propagates" begin
-        repl, mode = mock_repl((s, buf, ok) -> error("boom"))
         enable_timed_repl(repl)
-        @test_throws ErrorException mode.on_done(nothing, nothing, true)
+
+        @test captured_stdout(() -> call_on_done(mode)) == ""
     end
 
-    @testset "prints timing even when evaluation throws" begin
-        repl, mode = mock_repl((s, buf, ok) -> error("boom"))
-        enable_timed_repl(repl, -1.0)  # negative threshold always triggers
-        out = capture_stdout() do
+    @testset "exceptions propagate after timing cleanup" begin
+        repl, mode = mock_repl() do _s, _buf, _ok
+            error("boom")
+        end
+
+        enable_timed_repl(repl, Inf)
+        @test_throws ErrorException call_on_done(mode)
+
+        repl, mode = mock_repl() do _s, _buf, _ok
+            error("boom")
+        end
+
+        enable_timed_repl(repl, -Inf)
+        output = captured_stdout() do
             try
-                mode.on_done(nothing, nothing, true)
-            catch
+                call_on_done(mode)
+            catch err
+                @test err isa ErrorException
             end
         end
-        @test occursin(r"\[\d+\.\d+ sec\]", out)
-    end
 
+        @test occursin(r"\[\d+\.\d+ sec\]", output)
+    end
 end
